@@ -81,7 +81,7 @@ const char* MQTT_PASS  = "MQTT_PASS";
 |-----------|-------------|----------|
 | `WIFI_SSID` | Your WiFi network name | `"YOUR_SSID"` |
 | `WIFI_PASSWORD` | WiFi password | `"YOUR_WIFI_PASSWORD"` |
-| `MQTT_SERVER` | IP address of your MQTT broker | `"for example 192.168.20.10"` |
+| `MQTT_SERVER` | IP address of your MQTT broker | `"192.168.20.10"` |
 | `MQTT_PORT` | MQTT port (usually `1883`) | `1883` |
 | `MQTT_TOPIC` | Topic to publish location data to | `"darkride/vehicles/V01/location"` |
 | `MQTT_USER` | MQTT username | `"YOUR_MQTT_USERNAME"` |
