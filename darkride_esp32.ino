@@ -3,15 +3,18 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 
+//WIFI
 const char* WIFI_SSID     = "WIFI_SSID";
-const char* WIFI_PASSWORD = "WIFI_PASSWORD";
+const char* WIFI_PASSWORD = "WIFI_PASS";
 
+//MQTT
 const char* MQTT_SERVER = "MQTT_IP";
 const uint16_t MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "MQTT_TOPIC";
 const char* MQTT_USER  = "MQTT_USER";
 const char* MQTT_PASS  = "MQTT_PASS";
 
+//PN532
 #define PN532_IRQ   2
 #define PN532_RESET 3
 
@@ -134,6 +137,7 @@ void publishLocation(const String &location) {
 void setup() {
   Serial.begin(115200);
   delay(500);
+  Serial.println("ESP32 + PN532 + MQTT auth (location only)");
 
   Wire.begin(21, 22);
   Wire.setClock(400000);
@@ -141,8 +145,8 @@ void setup() {
   nfc.begin();
   uint32_t versiondata = nfc.getFirmwareVersion();
   if (!versiondata) {
-	Serial.println("PN532 not found");
-	while (1) delay(10);
+    Serial.println("PN532 not found");
+    while (1) delay(10);
   }
   Serial.print("PN5"); Serial.println((versiondata >> 24) & 0xFF, HEX);
   Serial.print("FW "); Serial.print((versiondata >> 16) & 0xFF);
@@ -155,7 +159,24 @@ void setup() {
   Serial.println("Waiting for RFID-tag");
 }
 
-
 void loop() {
+  if (WiFi.status() == WL_CONNECTED && !mqttClient.connected()) connectMQTT();
+  mqttClient.loop();
 
+  uint8_t uid[7];
+  uint8_t uidLen;
+  if (nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLen)) {
+    String location = "[unknown]";
+    if (uidLen == 4) {
+      location = readClassicLocation(uid, uidLen);
+    } else if (uidLen == 7) {
+      location = readUltralightLocation();
+    } else {
+      location = readUltralightLocation();
+    }
+
+    publishLocation(location);
+    delay(1000);
+  }
+  delay(50);
 }
