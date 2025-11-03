@@ -1,3 +1,5 @@
+#include <Wire.h>
+#include <Adafruit_PN532.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 
@@ -9,6 +11,12 @@ const uint16_t MQTT_PORT = 1883;
 const char* MQTT_TOPIC = "MQTT_TOPIC";
 const char* MQTT_USER  = "MQTT_USER";
 const char* MQTT_PASS  = "MQTT_PASS";
+
+#define PN532_IRQ   2
+#define PN532_RESET 3
+Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 
 void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
@@ -61,12 +69,69 @@ void connectMQTT() {
   }
 }
 
-void setup() {
-	Serial.begin(115200);
-	delay(500);
+String bytesToPrintableString(const uint8_t *buf, size_t len) {
+  String out = "";
+  for (size_t i = 0; i < len; i++) {
+    uint8_t c = buf[i];
+    if (c >= 32 && c <= 126) out += (char)c;
+    else if (c == 0x00) break;
+  }
+  while (out.length() && out[0] == ' ') out.remove(0, 1);
+  while (out.length() && out[out.length() - 1] == ' ') out.remove(out.length() - 1, 1);
+  if (out.length() == 0) return String("[no-readable-data]");
+  return out;
+}
 
-	connectWiFi();
-  	connectMQTT();
+String readClassicLocation(uint8_t *uid, uint8_t uidLen) {
+  uint8_t keya[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+  if (!nfc.mifareclassic_AuthenticateBlock(uid, uidLen, 4, 0, keya)) {
+    Serial.println("Classic auth failed");
+    return String("[auth-failed]");
+  }
+  uint8_t data[16];
+  if (!nfc.mifareclassic_ReadDataBlock(4, data)) {
+    Serial.println("Classic read failed");
+    return String("[read-failed]");
+  }
+  return bytesToPrintableString(data, 16);
+}
+
+String readUltralightLocation() {
+  uint8_t buf[16];
+  uint8_t page[4];
+  for (uint8_t p = 4; p <= 7; p++) {
+    if (!nfc.mifareultralight_ReadPage(p, page)) {
+      Serial.print("Ultralight read failed on page "); Serial.println(p);
+      return String("[read-failed]");
+    }
+    for (uint8_t i = 0; i < 4; i++) buf[(p - 4) * 4 + i] = page[i];
+  }
+  return bytesToPrintableString(buf, 16);
+}
+
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  Wire.begin(21, 22);
+  Wire.setClock(400000);
+
+  nfc.begin();
+  uint32_t versiondata = nfc.getFirmwareVersion();
+  if (!versiondata) {
+	Serial.println("PN532 not found");
+	while (1) delay(10);
+  }
+  Serial.print("PN5"); Serial.println((versiondata >> 24) & 0xFF, HEX);
+  Serial.print("FW "); Serial.print((versiondata >> 16) & 0xFF);
+  Serial.print("."); Serial.println((versiondata >> 8) & 0xFF);
+
+  nfc.SAMConfig();
+  connectWiFi();
+  connectMQTT();
+
+  Serial.println("Waiting for RFID-tag");
 }
 
 
