@@ -14,9 +14,12 @@ const char* MQTT_PASS  = "MQTT_PASS";
 
 #define PN532_IRQ   2
 #define PN532_RESET 3
+
 Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
+
+String lastLocation = "";
 
 void connectWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
@@ -109,6 +112,24 @@ String readUltralightLocation() {
   return bytesToPrintableString(buf, 16);
 }
 
+void publishLocation(const String &location) {
+  if (WiFi.status() != WL_CONNECTED) connectWiFi();
+  if (!mqttClient.connected()) connectMQTT();
+  mqttClient.loop();
+
+  if (location == lastLocation) {
+    Serial.println("Same location as last time, skipping publish.");
+    return;
+  }
+
+  bool ok = mqttClient.publish(MQTT_TOPIC, location.c_str());
+  if (ok) {
+    Serial.print("Published location: "); Serial.println(location);
+    lastLocation = location;
+  } else {
+    Serial.println("Failed to publish location");
+  }
+}
 
 void setup() {
   Serial.begin(115200);
