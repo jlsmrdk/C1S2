@@ -16,6 +16,21 @@ void connectWiFi() {
   Serial.println(WIFI_SSID);
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  unsigned long t0 = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+    if (millis() - t0 > 15000) {
+      Serial.println();
+      Serial.println("WiFi timeout, retrying");
+      WiFi.disconnect();
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+      t0 = millis();
+    }
+  }
+  Serial.println();
+  Serial.print("WiFi OK. IP: ");
+  Serial.println(WiFi.localIP());
 }
 
 void connectMQTT() {
